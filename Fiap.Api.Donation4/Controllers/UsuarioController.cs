@@ -1,5 +1,7 @@
 ﻿using Fiap.Api.Donation4.Models;
 using Fiap.Api.Donation4.Repository.Interfaces;
+using Fiap.Api.Donation4.ViewModel;
+using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Fiap.Api.Donation4.Controllers
@@ -72,30 +74,40 @@ namespace Fiap.Api.Donation4.Controllers
 
         [HttpPost]
         [Route("Login")]
-        public ActionResult<dynamic> Login([FromBody] UsuarioModel usuarioModel)
+        public ActionResult<LoginResponseVM> Login([FromBody] LoginRequestVM usuarioRequest)
         {
-            var usuario = _usuarioRepository.FindByEmailAndSenha(usuarioModel.EmailUsuario, usuarioModel.Senha);
-
-            if (usuario != null)
+            if (ModelState.IsValid)
             {
-                usuarioModel.Senha = string.Empty;
 
-                var tokenJWT = AutenticationService.GetToken(usuario);
+                var usuario = _usuarioRepository.FindByEmailAndSenha(usuarioRequest.EmailUsuario, usuarioRequest.Senha);
 
-                var retorno = new
+                if (usuario != null)
+                {   
+
+                    var tokenJWT = AutenticationService.GetToken(usuario);
+
+                    var loginResponse = new LoginResponseVM();
+                    loginResponse.Token = tokenJWT;
+                    loginResponse.NomeUsuario = usuario.NomeUsuario;
+                    loginResponse.Regra = usuario.Regra;
+                    loginResponse.EmailUsuario = usuario.EmailUsuario;
+                    loginResponse.UsuarioId = usuario.UsuarioId;
+
+
+                    return Ok(loginResponse);
+                }
+                else
                 {
-                    tokenJWT = tokenJWT,
-                    usuarioId = usuario.UsuarioId,
-                    usuarioEmail = usuario.EmailUsuario,
-                    regra = usuario.Regra,
-                };
-
-
-                return Ok(retorno);
+                    return Unauthorized();
+                }
             }
             else
             {
-                return Unauthorized();
+                var erros = ModelState.Values
+                                      .SelectMany(x => x.Errors)
+                                      .Select(x => x.ErrorMessage);
+
+                return BadRequest(erros);
             }
         }
 
